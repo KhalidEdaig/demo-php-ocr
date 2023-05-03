@@ -23,9 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         ->run();
                 } else {
                     $parser = new \Smalot\PdfParser\Parser();
-                    
+
                     $pdf = $parser->parseFile('uploads/' . $file_name);
-                    
+
                     $fileRead = $pdf->getText();
                 }
             } catch (Exception $e) {
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 
 <body>
-    <div class="container mt-5">
+    <div class="container py-5">
         <div class="row mt-5">
             <div class="col-sm-8 mx-auto">
                 <div class="jumbotron">

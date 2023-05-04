@@ -27,6 +27,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $pdf = $parser->parseFile('uploads/' . $file_name);
 
                     $fileRead = $pdf->getText();
+                    $dataInfo = [];
+                    $array = preg_split("/\r\n|\n|\r/", $fileRead);
+                    $dataSets = ["Facture N° : DUPLICATA", "FAC-000", "Facture N°F", "N° de facture", "FAC-00000003663", "Facture N°F452074270 du 03/03/2023 - Établie par Pauline M - FACTURE ACQUITTÉE", "Facture de vente n° 393737", "N°4004202304730400020"];
+                    $siretDataSets = ["Siret", "N°Siren / Siret :", "Siret:", "N°Siren / Siret :"];
+                    $dateDataSets = [""];
+                    foreach ($array as $key => $value) {
+                        foreach ($dataSets as $dataSet) {
+                            $facture = similar_text(trim($value), trim($dataSet), $percent);
+                            if (strlen($value) > 0) { // && strlen($value) >= 10
+                                $result = ($facture * 100) / strlen($value);
+                                if ($percent > 70) {
+                                    if (in_array(trim($value), $dataSets)) {
+                                        array_push($dataSets, trim($value));
+                                    }
+                                    $dataInfo['numero'] = $value;
+                                    // break;
+                                }
+                            }
+                        }
+                        foreach ($siretDataSets as $dataSet) {
+                            foreach (explode(" ", $value) as $word) {
+                                $str = preg_replace("/\s+/", "", strtolower($word));
+                                $getOnlyNumbers = preg_replace("/\D/", "", $str);
+                                if (strlen($getOnlyNumbers) >= 14) {
+                                    $facture = similar_text(trim($value), trim($dataSet), $percent);
+                                    $result = ($facture * 100) / strlen($value);
+                                    if ($percent > 30) {
+                                        if (in_array(trim($value), $siretDataSets)) {
+                                            array_push($siretDataSets, trim($value));
+                                        }
+                                        $dataInfo['siret'] = $getOnlyNumbers;
+                                        // break;
+                                    }
+                                }
+                            }
+                        }
+                        // foreach ($clientDataSets as $dataSet) {
+                        //     foreach (explode(" ", $value) as $word) {
+                        //         $str = preg_replace("/\s+/", "", strtolower($word));
+                        //         $getOnlyNumbers = preg_replace("/\D/", "", $str);
+                        //         if (strlen($getOnlyNumbers) >= 14) {
+                        //             $facture = similar_text(trim($value), trim($dataSet), $percent);
+                        //             $result = ($facture * 100) / strlen($value);
+                        //             if ($percent > 30) {
+                        //                 array_push($siretDataSets, trim($value));
+                        //                 $dataInfo['siret'] = $getOnlyNumbers;
+                        //                 // break;
+                        //             }
+                        //         }
+                        //     }
+                        // }
+                    }
+
+                    var_dump($dataInfo);
                 }
             } catch (Exception $e) {
                 echo $e->getMessage();

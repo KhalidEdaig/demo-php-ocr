@@ -1,6 +1,7 @@
 <?php
 
 use thiagoalessio\TesseractOCR\TesseractOCR;
+use Spatie\PdfToText\Pdf;
 
 require 'vendor/autoload.php';
 
@@ -22,48 +23,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         ->lang('eng', 'fr')
                         ->run();
                 } else {
-                    $parser = new \Smalot\PdfParser\Parser();
+                    // $parser = new \Smalot\PdfParser\Parser();
 
-                    $pdf = $parser->parseFile('uploads/' . $file_name);
+                    // $pdf = $parser->parseFile('uploads/' . $file_name);
 
-                    $fileRead = $pdf->getText();
+                    // $fileRead = $pdf->getText();
+
+                    $fileRead = (new Pdf())
+                        ->setPdf('uploads/' . $file_name)
+                        ->setOptions(['layout', 'r 96'])
+                        ->text();
+                }
+
+                if ($fileRead) {
                     $dataInfo = [];
-                    $array = preg_split("/\r\n|\n|\r/", $fileRead);
-                    $dataSets = ["Facture N° : DUPLICATA", "FAC-000", "Facture N°F", "N° de facture", "FAC-00000003663", "Facture N°F452074270 du 03/03/2023 - Établie par Pauline M - FACTURE ACQUITTÉE", "Facture de vente n° 393737", "N°4004202304730400020"];
-                    $siretDataSets = ["Siret", "N°Siren / Siret :", "Siret:", "N°Siren / Siret :"];
+                    function removeSpace($v)
+                    {
+                        return trim($v);
+                    }
+                    $array =  array_map("removeSpace", preg_split("/\r\n|\n|\r/", $fileRead));
+                    $array = array_filter($array, function ($txt) {
+                        return $txt ?? true;
+                    });
+
+                    $dataSets = [
+                        "Facture N° : DUPLICATA", "FAC-000",
+                        "Facture N°F",
+                        "N° de facture",
+                        "FAC-00000003663",
+                        "Facture N°F452074270 du 03/03/2023 - Établie par Pauline M - FACTURE ACQUITTÉE",
+                        "Facture de vente n° 393737",
+                        "N°4004202304730400020"
+                    ];
+                    $siretDataSets = [
+                        "Siret",
+                        "N°Siren / Siret :",
+                        "Siret:",
+                        "N°Siren / Siret :"
+                    ];
                     $dateDataSets = [""];
                     foreach ($array as $key => $value) {
-                        foreach ($dataSets as $dataSet) {
-                            $facture = similar_text(trim($value), trim($dataSet), $percent);
-                            if (strlen($value) > 0) { // && strlen($value) >= 10
-                                $result = ($facture * 100) / strlen($value);
+                        if (strlen($value) > 0) {
+                            foreach ($dataSets as $dataSet) {
+                                $facture = similar_text(trim($value), trim($dataSet), $percent);
                                 if ($percent > 70) {
                                     if (in_array(trim($value), $dataSets)) {
                                         array_push($dataSets, trim($value));
                                     }
-                                    $dataInfo['numero'] = $value;
-                                    // break;
+                                    $dataInfo['facture n°'] = $value;
                                 }
                             }
                         }
-                        foreach ($siretDataSets as $dataSet) {
-                            foreach (explode(" ", $value) as $word) {
-                                $str = preg_replace("/\s+/", "", strtolower($word));
-                                $getOnlyNumbers = preg_replace("/\D/", "", $str);
-                                if (strlen($getOnlyNumbers) >= 14) {
-                                    $facture = similar_text(trim($value), trim($dataSet), $percent);
-                                    $result = ($facture * 100) / strlen($value);
-                                    if ($percent > 30) {
-                                        if (in_array(trim($value), $siretDataSets)) {
-                                            array_push($siretDataSets, trim($value));
-                                        }
-                                        $dataInfo['siret'] = $getOnlyNumbers;
-                                        // break;
-                                    }
-                                }
-                            }
-                        }
-                        // foreach ($clientDataSets as $dataSet) {
+                        // foreach ($siretDataSets as $dataSet) {
                         //     foreach (explode(" ", $value) as $word) {
                         //         $str = preg_replace("/\s+/", "", strtolower($word));
                         //         $getOnlyNumbers = preg_replace("/\D/", "", $str);
@@ -71,16 +82,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         //             $facture = similar_text(trim($value), trim($dataSet), $percent);
                         //             $result = ($facture * 100) / strlen($value);
                         //             if ($percent > 30) {
-                        //                 array_push($siretDataSets, trim($value));
+                        //                 if (in_array(trim($value), $siretDataSets)) {
+                        //                     array_push($siretDataSets, trim($value));
+                        //                 }
                         //                 $dataInfo['siret'] = $getOnlyNumbers;
                         //                 // break;
                         //             }
                         //         }
                         //     }
                         // }
-                    }
+                        $str = preg_replace("/\s+/", "", strtolower($value));
 
-                    var_dump($dataInfo);
+                        $getOnlyNumbers = preg_replace("/\D/", "", $str);
+                        if ((str_contains($str, "siret") || str_contains($str, "siren")) & (strlen($getOnlyNumbers) >= 14)) {
+                            $dataInfo['siret' . $key] = $value;
+                        }
+
+                        $str = strtolower($value);
+                        if (
+                            (str_contains($str, "m.")
+                                || str_contains($str, "m")
+                                || str_contains($str, "mme.")
+                                || str_contains($str, "mme")
+                                || str_contains($str, "assuré")
+                                || str_contains($str, "monsieur")
+                                || str_contains($str, "madame")
+                            )
+                            &&
+                            strlen($str) <= 100
+                        ) {
+
+                            if (in_array(preg_split("/[\s,]+/", $str)[0], [
+                                "m.",
+                                "m",
+                                "mme.",
+                                "mme",
+                                "monsieur",
+                                "madame",
+                                "assuré"
+                            ])) {
+                                $dataInfo['client' . $key] = $value;
+                            }
+                        }
+                    }
                 }
             } catch (Exception $e) {
                 echo $e->getMessage();
@@ -109,22 +153,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="col-sm-8 mx-auto">
                 <div class="jumbotron">
                     <h1 class="display-4">Lire le texte des images ou pdf</h1>
-                    <p class="lead">
+                    <?php if ($_POST) : ?>
+                        <p class="lead">
+                        <pre><?= print_r($dataInfo); ?></pre>
+                        </p>
+                        <hr class="my-4">
+                        <p class="lead">
+                        <pre><?= print_r($array); ?></pre>
+                        </p>
+                        <hr class="my-4">
+                        <pre><?= $fileRead ?></pre>
+                        <p class="lead">
+                        </p>
+                    <?php endif; ?>
 
-
-                        <?php if ($_POST) : ?>
-
-                    <pre>
-                                <?= $fileRead ?>
-                            </pre>
-                <?php endif; ?>
-
-
-                </p>
-                <hr class="my-4">
                 </div>
             </div>
         </div>
+
         <div class="row col-sm-8 mx-auto">
             <div class="card mt-5">
                 <div class="card-body">

@@ -13,6 +13,7 @@
     ],
     "require": {
         "thiagoalessio/tesseract_ocr": "^2.12",
-        "smalot/pdfparser": "^2.5"
+        "smalot/pdfparser": "^2.5",
+        "spatie/pdf-to-text": "^1.52"
     }
 }

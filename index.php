@@ -37,18 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     foreach ($array as $key => $value) {
 
                         foreach ($dataSets as $dataSet) {
-                            $facture = similar_text(trim($value), trim($dataSet), $percent);
-                            if (strlen($value) > 0) { // && strlen($value) >= 10
-                                if ($percent > 70) {
-                                    if (in_array(trim($value), $dataSets)) {
-                                        array_push($dataSets, trim($value));
-                                    }
-                                    foreach (explode(" ", $value) as $word) {
-                                        $str = preg_replace("/\s+/", "", strtolower($word));
-                                        $getOnlyNumbers = preg_replace("/\D/", "", $str);
-                                        if (strlen($getOnlyNumbers) >= 6) {
-                                            $dataInfo['numero'] = $getOnlyNumbers;
-                                        }
+                            similar_text(trim($value), trim($dataSet), $percent);
+                            if (strlen($value) > 0 && $percent > 70) {
+                                if (in_array(trim($value), $dataSets)) {
+                                    array_push($dataSets, trim($value));
+                                }
+                                foreach (explode(" ", $value) as $word) {
+                                    $str = preg_replace("/\s+/", "", strtolower($word));
+                                    $getOnlyNumbers = preg_replace("/\D/", "", $str);
+                                    if (strlen($getOnlyNumbers) >= 6 && !str_contains(trim($value), "/")) {
+                                        $dataInfo['numero'] = $word;
                                     }
                                 }
                             }
@@ -59,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 $str = preg_replace("/\s+/", "", strtolower($word));
                                 $getOnlyNumbers = preg_replace("/\D/", "", $str);
                                 if (strlen($getOnlyNumbers) >= 14) {
-                                    $facture = similar_text(trim($value), trim($dataSet), $percent);
+                                    similar_text(trim($value), trim($dataSet), $percent);
                                     if ($percent > 30) {
                                         if (in_array(trim($value), $siretDataSets)) {
                                             array_push($siretDataSets, trim($value));
@@ -76,30 +74,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 if (str_contains($txt, "le") || str_contains($txt, "facture")) {
                                     foreach (explode(" ", $value) as $word) {
                                         if (strlen(trim($word)) >= 8 && str_contains(trim($word), trim($dataSet))) {
-                                            array_push($dates, trim($word));
+                                            $dataInfo['date'] = trim($word);
                                         }
                                     }
                                 }
                             }
                         }
-
-                        // foreach ($clientDataSets as $dataSet) {
-                        //     foreach (explode(" ", $value) as $word) {
-                        //         $str = preg_replace("/\s+/", "", strtolower($word));
-                        //         $getOnlyNumbers = preg_replace("/\D/", "", $str);
-                        //         if (strlen($getOnlyNumbers) >= 14) {
-                        //             $facture = similar_text(trim($value), trim($dataSet), $percent);
-                        //             $result = ($facture * 100) / strlen($value);
-                        //             if ($percent > 30) {
-                        //                 array_push($siretDataSets, trim($value));
-                        //                 $dataInfo['siret'] = $getOnlyNumbers;
-                        //                 // break;
-                        //             }
-                        //         }
-                        //     }
-                        // }
                     }
-                    $dataInfo['date'] = $dates[0] ?? null;
 
                     var_dump($dataInfo);
                 }

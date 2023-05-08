@@ -4,6 +4,7 @@ use thiagoalessio\TesseractOCR\TesseractOCR;
 
 require 'vendor/autoload.php';
 
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['submit'])) {
         $file_name = $_FILES['file']['name'];
@@ -31,38 +32,57 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $array = preg_split("/\r\n|\n|\r/", $fileRead);
                     $dataSets = ["Facture N° : DUPLICATA", "FAC-000", "Facture N°F", "N° de facture", "FAC-00000003663", "Facture N°F452074270 du 03/03/2023 - Établie par Pauline M - FACTURE ACQUITTÉE", "Facture de vente n° 393737", "N°4004202304730400020"];
                     $siretDataSets = ["Siret", "N°Siren / Siret :", "Siret:", "N°Siren / Siret :"];
-                    $dateDataSets = [""];
+                    $dateDataSets = ["/01/", "/02/", "/03/", "/04/", "/05/", "/06/", "/07/", "/08/", "/09/", "/10/", "/11/", "/12/"];
+                    $dates = array();
                     foreach ($array as $key => $value) {
+
                         foreach ($dataSets as $dataSet) {
                             $facture = similar_text(trim($value), trim($dataSet), $percent);
                             if (strlen($value) > 0) { // && strlen($value) >= 10
-                                $result = ($facture * 100) / strlen($value);
                                 if ($percent > 70) {
                                     if (in_array(trim($value), $dataSets)) {
                                         array_push($dataSets, trim($value));
                                     }
-                                    $dataInfo['numero'] = $value;
-                                    // break;
+                                    foreach (explode(" ", $value) as $word) {
+                                        $str = preg_replace("/\s+/", "", strtolower($word));
+                                        $getOnlyNumbers = preg_replace("/\D/", "", $str);
+                                        if (strlen($getOnlyNumbers) >= 6) {
+                                            $dataInfo['numero'] = $getOnlyNumbers;
+                                        }
+                                    }
                                 }
                             }
                         }
+
                         foreach ($siretDataSets as $dataSet) {
                             foreach (explode(" ", $value) as $word) {
                                 $str = preg_replace("/\s+/", "", strtolower($word));
                                 $getOnlyNumbers = preg_replace("/\D/", "", $str);
                                 if (strlen($getOnlyNumbers) >= 14) {
                                     $facture = similar_text(trim($value), trim($dataSet), $percent);
-                                    $result = ($facture * 100) / strlen($value);
                                     if ($percent > 30) {
                                         if (in_array(trim($value), $siretDataSets)) {
                                             array_push($siretDataSets, trim($value));
                                         }
                                         $dataInfo['siret'] = $getOnlyNumbers;
-                                        // break;
                                     }
                                 }
                             }
                         }
+
+                        foreach ($dateDataSets as $dataSet) {
+                            if (str_contains(trim($value), trim($dataSet))) {
+                                $txt = strtolower(trim($value));
+                                if (str_contains($txt, "le") || str_contains($txt, "facture")) {
+                                    foreach (explode(" ", $value) as $word) {
+                                        if (strlen(trim($word)) >= 8 && str_contains(trim($word), trim($dataSet))) {
+                                            array_push($dates, trim($word));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // foreach ($clientDataSets as $dataSet) {
                         //     foreach (explode(" ", $value) as $word) {
                         //         $str = preg_replace("/\s+/", "", strtolower($word));
@@ -79,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         //     }
                         // }
                     }
+                    $dataInfo['date'] = $dates[0] ?? null;
 
                     var_dump($dataInfo);
                 }

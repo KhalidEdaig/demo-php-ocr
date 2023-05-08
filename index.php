@@ -4,6 +4,10 @@ use thiagoalessio\TesseractOCR\TesseractOCR;
 use Spatie\PdfToText\Pdf;
 
 require 'vendor/autoload.php';
+require 'find-date.php';
+require 'find-facture.php';
+require 'find-client.php';
+require 'find-siret.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['submit'])) {
@@ -24,105 +28,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         ->run();
                 } else {
                     // $parser = new \Smalot\PdfParser\Parser();
-
                     // $pdf = $parser->parseFile('uploads/' . $file_name);
-
                     // $fileRead = $pdf->getText();
 
                     $fileRead = (new Pdf())
                         ->setPdf('uploads/' . $file_name)
                         ->setOptions(['layout', 'r 96'])
+                        ->addOptions(['f 1'])
                         ->text();
                 }
 
                 if ($fileRead) {
-                    $dataInfo = [];
+                    $dataTableExtract = [];
                     function removeSpace($v)
                     {
-                        return trim($v);
+                        return preg_replace('/\s\s+/', '    ', trim($v));
                     }
-                    $array =  array_map("removeSpace", preg_split("/\r\n|\n|\r/", $fileRead));
-                    $array = array_filter($array, function ($txt) {
+                    $textExtracted =  array_map("removeSpace", preg_split("/\r\n|\n|\r/", $fileRead));
+                    $textExtracted = array_filter($textExtracted, function ($txt) {
                         return $txt ?? true;
                     });
 
-                    $dataSets = [
-                        "Facture N° : DUPLICATA", "FAC-000",
-                        "Facture N°F",
-                        "N° de facture",
-                        "FAC-00000003663",
-                        "Facture N°F452074270 du 03/03/2023 - Établie par Pauline M - FACTURE ACQUITTÉE",
-                        "Facture de vente n° 393737",
-                        "N°4004202304730400020"
-                    ];
-                    $siretDataSets = [
-                        "Siret",
-                        "N°Siren / Siret :",
-                        "Siret:",
-                        "N°Siren / Siret :"
-                    ];
-                    $dateDataSets = [""];
-                    foreach ($array as $key => $value) {
+
+                    foreach ($textExtracted as $key => $value) {
                         if (strlen($value) > 0) {
-                            foreach ($dataSets as $dataSet) {
-                                $facture = similar_text(trim($value), trim($dataSet), $percent);
-                                if ($percent > 70) {
-                                    if (in_array(trim($value), $dataSets)) {
-                                        array_push($dataSets, trim($value));
-                                    }
-                                    $dataInfo['facture n°'] = $value;
-                                }
-                            }
-                        }
-                        // foreach ($siretDataSets as $dataSet) {
-                        //     foreach (explode(" ", $value) as $word) {
-                        //         $str = preg_replace("/\s+/", "", strtolower($word));
-                        //         $getOnlyNumbers = preg_replace("/\D/", "", $str);
-                        //         if (strlen($getOnlyNumbers) >= 14) {
-                        //             $facture = similar_text(trim($value), trim($dataSet), $percent);
-                        //             $result = ($facture * 100) / strlen($value);
-                        //             if ($percent > 30) {
-                        //                 if (in_array(trim($value), $siretDataSets)) {
-                        //                     array_push($siretDataSets, trim($value));
-                        //                 }
-                        //                 $dataInfo['siret'] = $getOnlyNumbers;
-                        //                 // break;
-                        //             }
-                        //         }
-                        //     }
-                        // }
-                        $str = preg_replace("/\s+/", "", strtolower($value));
+                            if ($date = find_date($value))
+                                $dataTableExtract[$key . ' date'] = $value;
 
-                        $getOnlyNumbers = preg_replace("/\D/", "", $str);
-                        if ((str_contains($str, "siret") || str_contains($str, "siren")) & (strlen($getOnlyNumbers) >= 14)) {
-                            $dataInfo['siret' . $key] = $value;
-                        }
+                            if ($facture = find_facture($value))
+                                $dataTableExtract[$key . ' - facture n°'] = $facture;
 
-                        $str = strtolower($value);
-                        if (
-                            (str_contains($str, "m.")
-                                || str_contains($str, "m")
-                                || str_contains($str, "mme.")
-                                || str_contains($str, "mme")
-                                || str_contains($str, "assuré")
-                                || str_contains($str, "monsieur")
-                                || str_contains($str, "madame")
-                            )
-                            &&
-                            strlen($str) <= 100
-                        ) {
+                            if ($client = find_client($value, $dataTableExtract))
+                                $dataTableExtract[$key . ' - client'] = $client;
 
-                            if (in_array(preg_split("/[\s,]+/", $str)[0], [
-                                "m.",
-                                "m",
-                                "mme.",
-                                "mme",
-                                "monsieur",
-                                "madame",
-                                "assuré"
-                            ])) {
-                                $dataInfo['client' . $key] = $value;
-                            }
+                            if ($siret = find_siret($value))
+                                $dataTableExtract[$key . ' - siret'] = $siret;
                         }
                     }
                 }
@@ -149,17 +89,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <body>
     <div class="container py-5">
+        <div class="row">
+            <div class="col-sm-12 mx-auto">
+                <h1 class="display-4 text-center">Lire le texte des images ou pdf</h1>
+            </div>
+        </div>
         <div class="row mt-5">
-            <div class="col-sm-8 mx-auto">
+
+            <div class="col-sm-12 mx-auto">
                 <div class="jumbotron">
-                    <h1 class="display-4">Lire le texte des images ou pdf</h1>
+
                     <?php if ($_POST) : ?>
                         <p class="lead">
-                        <pre><?= print_r($dataInfo); ?></pre>
+                        <pre><?= print_r($dataTableExtract); ?></pre>
                         </p>
                         <hr class="my-4">
                         <p class="lead">
-                        <pre><?= print_r($array); ?></pre>
+                        <pre><?= print_r($textExtracted); ?></pre>
                         </p>
                         <hr class="my-4">
                         <pre><?= $fileRead ?></pre>
